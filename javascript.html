@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KPRIET SGPA / CGPA Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{box-sizing:border-box;font-family:'Segoe UI',Arial}
+
+/* 🌌 BACKGROUND */
+body{
+  margin:0;
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(-45deg,#020024,#090979,#2b1055,#000);
+  background-size:400% 400%;
+  animation:bgMove 16s ease infinite;
+  overflow:hidden;
+}
+@keyframes bgMove{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+/* ⭐ STARS CANVAS */
+#stars{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+}
+
+/* 🌌 GLASS CARD */
+.container{
+  position:relative;
+  z-index:2;
+  width:100%;
+  max-width:480px;
+  padding:24px;
+  border-radius:22px;
+  background:linear-gradient(
+    135deg,
+    rgba(99,102,241,.25),
+    rgba(168,85,247,.25),
+    rgba(14,165,233,.18)
+  );
+  backdrop-filter:blur(22px);
+  border:1px solid rgba(255,255,255,.35);
+  box-shadow:0 30px 70px rgba(0,0,0,.6);
+}
+
+/* HEADER */
+.header{text-align:center;margin:12px 0}
+.header img{width:70px}
+.header h2{
+  margin:6px 0;
+  background:linear-gradient(90deg,#38bdf8,#a855f7,#6366f1);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+/* INPUTS */
+input,select,button{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.22);
+  backdrop-filter:blur(10px);
+  color:#fff;
+}
+button{
+  background:linear-gradient(135deg,#6366f1,#a855f7,#38bdf8);
+  color:#fff;
+  border:none;
+  cursor:pointer;
+}
+button:hover{transform:translateY(-2px)}
+
+/* PAGES */
+.page{display:none}
+.page.active{display:block}
+
+/* SUBJECT */
+.subject{
+  background:rgba(255,255,255,.25);
+  padding:12px;
+  border-radius:16px;
+  margin-top:10px;
+}
+
+/* RESULT */
+.overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.65);
+  backdrop-filter:blur(10px);
+  align-items:center;
+  justify-content:center;
+  z-index:3;
+}
+.resultCard{
+  background:linear-gradient(
+    135deg,
+    rgba(30,27,75,.6),
+    rgba(88,28,135,.5),
+    rgba(14,165,233,.4)
+  );
+  border-radius:26px;
+  padding:28px;
+  text-align:center;
+  width:90%;
+  max-width:340px;
+}
+.resultCard span{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:40px;
+  font-weight:bold;
+  width:140px;
+  height:140px;
+  margin:12px auto;
+  border-radius:50%;
+  background:linear-gradient(135deg,#38bdf8,#a855f7);
+}
+.printBtn{background:#0f766e}
+
+/* CONFETTI */
+.confetti{
+  position:fixed;
+  top:-10px;
+  width:10px;
+  height:10px;
+  animation:fall 3s linear forwards;
+}
+@keyframes fall{
+  to{transform:translateY(110vh) rotate(360deg);opacity:0}
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="container">
+
+  <div class="header">
+    <img src="logo.png">
+    <h2>KPRIET Calculator</h2>
+  </div>
+
+  <div class="page active" id="page0">
+    <button onclick="selectType('sgpa')">SGPA</button>
+    <button onclick="selectType('cgpa')">CGPA</button>
+  </div>
+
+  <div class="page" id="page1">
+    <input id="studentName" placeholder="Student Name">
+    <input id="rollNo" placeholder="Roll Number">
+    <button onclick="nextFromDetails()">Next</button>
+  </div>
+
+  <div class="page" id="pageSGPA">
+    <input id="subCount" type="number" placeholder="Number of Subjects">
+    <button onclick="buildSGPA()">Generate</button>
+    <div id="subjects"></div>
+    <button onclick="calculateSGPA()">Calculate SGPA</button>
+  </div>
+
+  <div class="page" id="pageCGPA">
+    <input id="prevCGPA" placeholder="Previous CGPA">
+    <input id="prevCredits" placeholder="Previous Credits">
+    <input id="currSGPA" placeholder="Current SGPA">
+    <input id="currCredits" placeholder="Current Credits">
+    <button onclick="calculateCGPA()">Calculate CGPA</button>
+  </div>
+
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="resultCard">
+    <h3 id="resultTitle"></h3>
+    <span id="finalValue"></span>
+    <button class="printBtn" onclick="window.print()">Print</button>
+    <button onclick="closeResult()">Close</button>
+  </div>
+</div>
+
+<script>
+/* ⭐ STARS + MOUSE REPULSION */
+const canvas=document.getElementById("stars");
+const ctx=canvas.getContext("2d");
+let mouse={x:null,y:null};
+
+function resize(){
+  canvas.width=innerWidth;
+  canvas.height=innerHeight;
+}
+resize();
+addEventListener("resize",resize);
+addEventListener("mousemove",e=>{
+  mouse.x=e.clientX;
+  mouse.y=e.clientY;
+});
+
+let stars=[];
+for(let i=0;i<160;i++){
+  stars.push({
+    x:Math.random()*canvas.width,
+    y:Math.random()*canvas.height,
+    r:Math.random()*1.5+0.3,
+    vy:Math.random()*0.6+0.2
+  });
+}
+
+function animateStars(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stars.forEach(s=>{
+    if(mouse.x){
+      let dx=s.x-mouse.x;
+      let dy=s.y-mouse.y;
+      let dist=Math.sqrt(dx*dx+dy*dy);
+
+      /* 🔥 REPULSION */
+      if(dist<140){
+        s.x+=dx/20;
+        s.y+=dy/20;
+      }
+    }
+
+    s.y+=s.vy;
+    if(s.y>canvas.height){
+      s.y=0;
+      s.x=Math.random()*canvas.width;
+    }
+
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle="white";
+    ctx.fill();
+  });
+  requestAnimationFrame(animateStars);
+}
+animateStars();
+
+/* 🌠 SHOOTING STAR */
+function shootingStar(){
+  let sx=Math.random()*canvas.width;
+  let sy=Math.random()*canvas.height/2;
+  let tx=sx+300;
+  let ty=sy+200;
+  let p=0;
+  function draw(){
+    p+=0.04;
+    if(p>=1)return;
+    let x=sx+(tx-sx)*p;
+    let y=sy+(ty-sy)*p;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x-80,y-40);
+    ctx.strokeStyle="rgba(255,255,255,.8)";
+    ctx.lineWidth=2;
+    ctx.stroke();
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+setInterval(shootingStar,10000);
+
+/* 🎇 STAR BURST */
+function starBurst(){
+  for(let i=0;i<50;i++){
+    let a=Math.random()*Math.PI*2;
+    let s=Math.random()*6+2;
+    let x=canvas.width/2;
+    let y=canvas.height/2;
+    let life=50;
+    let iv=setInterval(()=>{
+      ctx.beginPath();
+      ctx.arc(x,y,2,0,Math.PI*2);
+      ctx.fillStyle="white";
+      ctx.fill();
+      x+=Math.cos(a)*s;
+      y+=Math.sin(a)*s;
+      if(--life<=0)clearInterval(iv);
+    },16);
+  }
+}
+
+/* 📊 CALCULATOR LOGIC */
+let type="";
+function selectType(t){
+  type=t;
+  page0.classList.remove("active");
+  page1.classList.add("active");
+}
+function nextFromDetails(){
+  page1.classList.remove("active");
+  type==="sgpa"?pageSGPA.classList.add("active"):pageCGPA.classList.add("active");
+}
+function buildSGPA(){
+  subjects.innerHTML="";
+  for(let i=1;i<=subCount.value;i++){
+    subjects.innerHTML+=`
+    <div class="subject">
+      <select class="grade">
+        <option value="10">O</option>
+        <option value="9">A+</option>
+        <option value="8">A</option>
+        <option value="7">B+</option>
+        <option value="6">B</option>
+      </select>
+      <input class="credit" placeholder="Credits">
+    </div>`;
+  }
+}
+function calculateSGPA(){
+  let g=document.getElementsByClassName("grade");
+  let c=document.getElementsByClassName("credit");
+  let p=0,cr=0;
+  for(let i=0;i<g.length;i++){
+    p+=g[i].value*c[i].value;
+    cr+=Number(c[i].value);
+  }
+  showResult("SGPA",(p/cr).toFixed(2));
+}
+function calculateCGPA(){
+  let total=(prevCGPA.value*prevCredits.value)+(currSGPA.value*currCredits.value);
+  let credits=Number(prevCredits.value)+Number(currCredits.value);
+  showResult("CGPA",(total/credits).toFixed(2));
+}
+function showResult(t,v){
+  resultTitle.innerText=t+" RESULT";
+  finalValue.innerText=v;
+  overlay.style.display="flex";
+  blast();
+  starBurst();
+}
+function closeResult(){overlay.style.display="none";}
+
+/* 🎉 CONFETTI */
+function blast(){
+  for(let i=0;i<40;i++){
+    let c=document.createElement("div");
+    c.className="confetti";
+    c.style.left=Math.random()*100+"vw";
+    c.style.background=`hsl(${Math.random()*360},100%,50%)`;
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),3000);
+  }
+}
+</script>
+
+</body>
+</html>
